@@ -31,6 +31,7 @@ const CODIGOS = new Set(AEROPORTOS.map((a) => a.codigo));
 // Aliases de cidade (inglês + português) → código IATA.
 const ALIASES_EXTRA: Record<string, string> = {
   athens: "ATH",
+  atenas: "ATH",
   istanbul: "IST",
   belgrade: "BEG",
   lisbon: "LIS",
@@ -42,6 +43,8 @@ const ALIASES_EXTRA: Record<string, string> = {
   london: "LHR",
   "sao paulo": "GRU",
   guarulhos: "GRU",
+  rio: "GIG",
+  "rio de janeiro": "GIG",
 };
 
 const ALIASES: Record<string, string> = (() => {
@@ -167,7 +170,7 @@ export function detectarPreco(
 
   // E-mails "de X para Y" / "was X now Y": preferir preço após palavra de transição.
   // Só ativa quando há mais de um candidato, para não afetar casos simples.
-  const kwRe = /\b(?:now|para|caiu\s+para|baixou\s+para|por)\s*(R\$|US\$|€|£|\$|EUR|USD|BRL|GBP)/gi;
+  const kwRe = /\b(?:now|to|para|caiu\s+para|baixou\s+para|por)\s*(R\$|US\$|€|£|\$|EUR|USD|BRL|GBP)/gi;
   while ((m = kwRe.exec(texto))) {
     const idxMoeda = m.index + m[0].length - m[1].length;
     const pref = candidatos.find((c) => c.idx >= idxMoeda - 1 && c.idx <= idxMoeda + 3);
@@ -202,7 +205,7 @@ export function detectarDatas(texto: string): string[] {
     add(ano, +m[2], +m[1], m.index); // dd/mm/yyyy
   }
 
-  const reDiaMes = /\b(\d{1,2})\s+([a-zç]{3,9})\.?\s+(\d{4})\b/gi;
+  const reDiaMes = /\b(\d{1,2})(?:\s+de)?\s+([a-zç]{3,9})\.?(?:\s+de)?\s+(\d{4})\b/gi;
   while ((m = reDiaMes.exec(texto))) {
     const mes = MESES[m[2].slice(0, 3).toLowerCase()];
     if (mes) add(+m[3], mes, +m[1], m.index);
