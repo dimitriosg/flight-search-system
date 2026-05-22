@@ -139,19 +139,42 @@ export function normalizarNumero(entrada: string): number | null {
 export function detectarPreco(
   texto: string,
 ): { preco: number; moeda: string | null } | null {
-  const antes = /(R\$|US\$|€|£|\$|EUR|USD|BRL|GBP)\s*([\d][\d.,]*\d|\d)/i.exec(texto);
-  const depois = /([\d][\d.,]*\d|\d)\s*(€|£|EUR|USD|BRL|GBP|reais|euros?)/i.exec(texto);
+  interface Candidato { preco: number; moeda: string | null; idx: number }
+  const candidatos: Candidato[] = [];
 
-  const escolha = antes
-    ? { simbolo: antes[1], numero: antes[2] }
-    : depois
-      ? { simbolo: depois[2], numero: depois[1] }
-      : null;
-  if (!escolha) return null;
+  // Moeda antes do número: €2,150  R$ 9.800  EUR 2150
+  const patAntes = /(R\$|US\$|€|£|\$|EUR|USD|BRL|GBP)\s*([\d][\d.,]*\d|\d)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = patAntes.exec(texto))) {
+    const preco = normalizarNumero(m[2]);
+    if (preco != null) candidatos.push({ preco, moeda: codigoMoeda(m[1]), idx: m.index });
+  }
 
-  const preco = normalizarNumero(escolha.numero);
-  if (preco == null) return null;
-  return { preco, moeda: codigoMoeda(escolha.simbolo) };
+  // Moeda depois do número: 2150 EUR  9.800 reais (só se ainda não capturado)
+  const cobertos = new Set(candidatos.map((c) => c.idx));
+  const patDepois = /([\d][\d.,]*\d|\d)\s*(€|£|EUR|USD|BRL|GBP|reais|euros?)/gi;
+  while ((m = patDepois.exec(texto))) {
+    if (!cobertos.has(m.index)) {
+      const preco = normalizarNumero(m[1]);
+      if (preco != null) candidatos.push({ preco, moeda: codigoMoeda(m[2]), idx: m.index });
+    }
+  }
+
+  if (candidatos.length === 0) return null;
+
+  candidatos.sort((a, b) => a.idx - b.idx);
+  if (candidatos.length === 1) return { preco: candidatos[0].preco, moeda: candidatos[0].moeda };
+
+  // E-mails "de X para Y" / "was X now Y": preferir preço após palavra de transição.
+  // Só ativa quando há mais de um candidato, para não afetar casos simples.
+  const kwRe = /\b(?:now|para|caiu\s+para|baixou\s+para|por)\s*(R\$|US\$|€|£|\$|EUR|USD|BRL|GBP)/gi;
+  while ((m = kwRe.exec(texto))) {
+    const idxMoeda = m.index + m[0].length - m[1].length;
+    const pref = candidatos.find((c) => c.idx >= idxMoeda - 1 && c.idx <= idxMoeda + 3);
+    if (pref) return { preco: pref.preco, moeda: pref.moeda };
+  }
+
+  return { preco: candidatos[0].preco, moeda: candidatos[0].moeda };
 }
 
 function isoValido(ano: number, mes: number, dia: number): boolean {

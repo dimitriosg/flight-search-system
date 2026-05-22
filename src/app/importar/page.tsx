@@ -212,9 +212,10 @@ export default function ImportarPage() {
         <div className="space-y-4">
           {preview.duplicado && (
             <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
-              ⚠️ Este e-mail já foi importado anteriormente (hash idêntico). Você
-              pode importar mesmo assim se quiser sobrescrever os campos
-              corrigidos — mas será recusado como duplicado pela API.
+              ⚠️ Este e-mail já foi importado anteriormente (conteúdo idêntico).
+              Para registrar um preço desta rota novamente, cole um e-mail
+              diferente ou registre a observação manualmente em{" "}
+              <a href="/observacoes" className="underline">Observações</a>.
             </div>
           )}
 
@@ -305,14 +306,14 @@ export default function ImportarPage() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => handleImportar(true)}
-                disabled={carregando || !origem || !destino || !cabine || !preco}
+                disabled={carregando || preview.duplicado || !origem || !destino || !cabine || !preco}
                 className="flex-1 rounded bg-sky-600 hover:bg-sky-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
               >
                 {carregando ? "Salvando…" : "Salvar + criar observação de preço"}
               </button>
               <button
                 onClick={() => handleImportar(false)}
-                disabled={carregando}
+                disabled={carregando || preview.duplicado}
                 className="rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-50 px-4 py-2 text-sm text-slate-300 transition-colors"
               >
                 Salvar só o e-mail

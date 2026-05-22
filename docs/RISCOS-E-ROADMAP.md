@@ -56,9 +56,31 @@ permanecem puros e testados, sem saber de onde o dado veio.
 - Não ser um motor de reserva — a compra é sempre no site oficial.
 - Não depender de API paga para o v1 ser útil.
 
-## 5. Próximos passos sugeridos (pequenos incrementos)
+## 5. Fase 3 — arquitetura de ingestão automática (sem OAuth ainda)
 
-1. Parser de e-mail de alertas (IMAP) → cria Observações automaticamente.
+O ponto de entrada unificado já existe: `src/lib/ingestao.ts → ingerirTexto()`.
+Qualquer fonte futura chama essa função com `{ textoBruto, assunto?, remetente? }`
+e recebe `{ parsed: AlertaParseado, hash: string }`. Nenhuma mudança no parser,
+na lógica de scoring ou nas APIs é necessária.
+
+### Caminho recomendado para automação (sem OAuth/scraping)
+
+| Passo | O que fazer | Risco |
+|-------|-------------|-------|
+| **5a. Encaminhamento de e-mail** | Criar filtro no Gmail que encaminha alertas do Google Flights / Skyscanner para um endereço próprio; processar via webhook. | Baixo — é o seu próprio inbox. |
+| **5b. IMAP local** | Script Node.js usa `node-imap` + `mailparser` para ler a pasta de alertas sem OAuth; chama `ingerirTexto()` para cada mensagem nova. | Baixo — credenciais locais, sem terceiros. |
+| **5c. Webhook / Zapier** | Zapier ou Make intercepta o e-mail e posta o corpo via `POST /api/importacoes` com `criarObservacao: true`. | Baixo — depende de serviço externo, mas sem scraping. |
+
+### Restrições mantidas
+- **Sem OAuth do Google** (escopo é v1 pessoal, local).
+- **Sem scraping** de Google Flights, Skyscanner ou companhias aéreas.
+- **Sem compra automática** — o sistema apenas detecta e pontua; a decisão de compra é sempre do usuário no site oficial.
+- `ingerirTexto()` e `POST /api/importacoes` são os únicos pontos de entrada válidos;
+  qualquer automação futura **deve** passar por eles.
+
+## 6. Próximos passos sugeridos (pequenos incrementos)
+
+1. Parser de e-mail de alertas (IMAP local, sem OAuth) → cria Observações automaticamente via `ingerirTexto()`.
 2. Exportar/importar CSV de Observações (backup e carga em massa).
 3. Gráfico de tendência de preço por rota (a partir das Observações).
 4. Integração opcional com uma API oficial de tarifas (atrás de feature flag).

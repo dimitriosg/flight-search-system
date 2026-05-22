@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { ok } from "@/lib/api";
+import { ok, tratarErro } from "@/lib/api";
 import { enriquecer, type OportunidadeEnriquecida } from "@/lib/enrich";
 import { detectarFortesOportunidades } from "@/lib/opportunities";
 
@@ -7,6 +7,7 @@ const porNotaDesc = (a: OportunidadeEnriquecida, b: OportunidadeEnriquecida) =>
   b.pontuacao.nota - a.pontuacao.nota;
 
 export async function GET() {
+  try {
   const [opps, rotas, alertas, observacoes] = await Promise.all([
     prisma.oportunidade.findMany(),
     prisma.rota.findMany(),
@@ -90,4 +91,7 @@ export async function GET() {
     porOrigem,
     rotasPotencial,
   });
+  } catch (e) {
+    return tratarErro(e);
+  }
 }
