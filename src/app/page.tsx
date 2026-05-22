@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { OportunidadeEnriquecida } from "@/lib/enrich";
+import type { ForteOportunidade } from "@/lib/opportunities";
 import { getJSON } from "@/lib/client";
 import { OportunidadeCard } from "@/components/OportunidadeCard";
 import {
@@ -23,6 +24,7 @@ interface DashboardData {
     alertasAtivos: number;
     observacoes: number;
   };
+  fortesOportunidades: ForteOportunidade[];
   melhores: OportunidadeEnriquecida[];
   businessGatilho: OportunidadeEnriquecida[];
   proximasAcoes: OportunidadeEnriquecida[];
@@ -71,6 +73,19 @@ export default function DashboardPage() {
         <Stat titulo="Alertas ativos" valor={d.totais.alertasAtivos} />
         <Stat titulo="Observações" valor={d.totais.observacoes} />
       </div>
+
+      {d.fortesOportunidades.length > 0 && (
+        <section>
+          <SectionTitle hint="Preços observados via importação de e-mail com nota ≥ 8 ou gatilho de compra">
+            🔥 Ação necessária — oportunidades fortes detectadas
+          </SectionTitle>
+          <div className="space-y-2">
+            {d.fortesOportunidades.map((f) => (
+              <BannerForte key={f.observacaoId} forte={f} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {semDados && (
         <EmptyState>
@@ -288,5 +303,38 @@ function BarraNota({
       </div>
       <span className="w-6 text-right tabular-nums text-slate-400">{total}</span>
     </div>
+  );
+}
+
+function BannerForte({ forte }: { forte: ForteOportunidade }) {
+  return (
+    <Card className="border border-amber-500/40 bg-amber-500/5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-amber-300">
+            {forte.origem} → {forte.destino}{" "}
+            <span className="text-slate-400 font-normal">
+              · {rotuloCabine(forte.cabine)}
+            </span>
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5">
+            {forte.precoCash != null ? fmt.euro(forte.precoCash) : "—"}
+            {forte.fonte ? ` · ${forte.fonte}` : ""}
+            {forte.gatilho ? (
+              <span className="ml-2 text-amber-400">⚡ Gatilho de compra</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <NotaBadge nota={forte.pontuacao.nota} />
+          <Link
+            href="/importar"
+            className="text-xs text-sky-400 hover:underline whitespace-nowrap"
+          >
+            Ver importações →
+          </Link>
+        </div>
+      </div>
+    </Card>
   );
 }

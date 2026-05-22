@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { ok } from "@/lib/api";
 import { enriquecer, type OportunidadeEnriquecida } from "@/lib/enrich";
+import { detectarFortesOportunidades } from "@/lib/opportunities";
 
 const porNotaDesc = (a: OportunidadeEnriquecida, b: OportunidadeEnriquecida) =>
   b.pontuacao.nota - a.pontuacao.nota;
@@ -69,6 +70,8 @@ export async function GET() {
     (a, b) => b.melhorNota - a.melhorNota,
   );
 
+  const fortesOportunidades = detectarFortesOportunidades(observacoes, rotas);
+
   return ok({
     totais: {
       oportunidades: enr.length,
@@ -77,6 +80,7 @@ export async function GET() {
       alertasAtivos: alertas.filter((a) => a.ativo).length,
       observacoes: observacoes.length,
     },
+    fortesOportunidades,
     melhores,
     businessGatilho,
     proximasAcoes,

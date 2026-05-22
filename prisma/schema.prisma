@@ -72,6 +72,33 @@ model Observacao {
   @@index([origem, destino, cabine])
 }
 
+/// Importações de alertas de e-mail (entrada manual: texto colado).
+/// O parser extrai os campos; uma importação pode gerar uma Observacao.
+/// NÃO faz scraping nem acessa caixas de e-mail: opera apenas sobre o texto
+/// que o usuário cola. Ponto de entrada preparado para fontes futuras.
+model ImportacaoEmail {
+  id           String    @id @default(cuid())
+  fonte        String? // provedor detectado: Google Flights | Skyscanner | ...
+  assunto      String?
+  remetente    String?
+  recebidoEm   DateTime?
+  textoBruto   String
+  origem       String? // campos extraídos pelo parser (ou corrigidos)
+  destino      String?
+  cabine       String?
+  preco        Float?
+  moeda        String? // EUR | USD | BRL | GBP | ...
+  dataIda      DateTime?
+  dataVolta    DateTime?
+  confianca    Float     @default(0) // 0..1
+  status       String    @default("pendente") // pendente | importado | ignorado | falha
+  observacaoId String? // Observacao criada a partir desta importação
+  hash         String    @unique // deduplicação (sha256 do texto normalizado)
+  createdAt    DateTime  @default(now())
+
+  @@index([origem, destino, cabine])
+}
+
 /// Alertas criados em plataformas externas (alertas manuais)
 model Alerta {
   id             String   @id @default(cuid())

@@ -98,6 +98,34 @@ function fatorPreco(
   };
 }
 
+function fatorMilha(
+  precoCash: number | null,
+  taxas: number,
+  milhasNecessarias: number | null,
+): FatorPontuacao | null {
+  const milha = calcularMilha(precoCash, taxas, milhasNecessarias);
+  if (!milha) return null;
+  const mapa = { excelente: 20, bom: 12, aceitavel: 3, fraco: -10 } as const;
+  return {
+    fator: "Valor por milha",
+    pontos: mapa[milha.qualidade],
+    detalhe: `€${milha.valorPorMilha.toFixed(4)}/milha (${milha.qualidade})`,
+  };
+}
+
+function fatorCabine(cabine: string): FatorPontuacao {
+  // Business é a prioridade declarada do usuário.
+  const pontos = cabine === "business" ? 2 : cabine === "premium" ? 1 : 0;
+  return { fator: "Cabine", pontos, detalhe: cabine };
+}
+
+function notaDaSoma(fatores: FatorPontuacao[]): ResultadoPontuacao {
+  const soma = fatores.reduce((acc, f) => acc + f.pontos, 0);
+  const pontosBrutos = clamp(BASE + soma, 0, 100);
+  const nota = clamp(Math.round(pontosBrutos / 10), 1, 10);
+  return { nota, pontosBrutos, rotulo: rotuloNota(nota), fatores };
+}
+
 export function pontuarDeal(
   opp: OportunidadeCore,
   ctx: ContextoRota,
@@ -106,16 +134,8 @@ export function pontuarDeal(
 
   fatores.push(fatorPreco(opp, ctx));
 
-  // Valor por milha (quando aplicável)
-  const milha = calcularMilha(opp.precoCash, opp.taxas, opp.milhasNecessarias);
-  if (milha) {
-    const mapa = { excelente: 20, bom: 12, aceitavel: 3, fraco: -10 } as const;
-    fatores.push({
-      fator: "Valor por milha",
-      pontos: mapa[milha.qualidade],
-      detalhe: `€${milha.valorPorMilha.toFixed(4)}/milha (${milha.qualidade})`,
-    });
-  }
+  const milha = fatorMilha(opp.precoCash, opp.taxas, opp.milhasNecessarias);
+  if (milha) fatores.push(milha);
 
   // Compra direta com a companhia
   fatores.push({
@@ -182,20 +202,48 @@ export function pontuarDeal(
     detalhe: opp.flexCancelamento,
   });
 
-  // Prioridade de cabine (business é a prioridade declarada do usuário)
-  const cabinePts =
-    opp.cabine === "business" ? 2 : opp.cabine === "premium" ? 1 : 0;
-  fatores.push({
-    fator: "Cabine",
-    pontos: cabinePts,
-    detalhe: opp.cabine,
-  });
+  fatores.push(fatorCabine(opp.cabine));
 
-  const soma = fatores.reduce((acc, f) => acc + f.pontos, 0);
-  const pontosBrutos = clamp(BASE + soma, 0, 100);
-  const nota = clamp(Math.round(pontosBrutos / 10), 1, 10);
+  return notaDaSoma(fatores);
+}
 
-  return { nota, pontosBrutos, rotulo: rotuloNota(nota), fatores };
+/**
+ * Pontua um PREÇO OBSERVADO (não um deal completo): usa apenas os sinais que
+ * uma observação tem — preço vs. histórico, valor por milha e cabine.
+ * Serve para detectar fortes oportunidades a partir de Observacoes.
+ */
+export function pontuarObservado(
+  obs: {
+    cabine: string;
+    precoCash: number | null;
+    milhasNecessarias: number | null;
+    taxas: number;
+  },
+  ctx: ContextoRota,
+): ResultadoPontuacao {
+  const core: OportunidadeCore = {
+    origem: "",
+    destino: "",
+    cabine: obs.cabine,
+    escalas: 0,
+    duracaoMinutos: null,
+    precoCash: obs.precoCash,
+    milhasNecessarias: obs.milhasNecessarias,
+    taxas: obs.taxas,
+    bagagemIncluida: false,
+    compraDireta: false,
+    bilhetesSeparados: false,
+    conexaoHoras: null,
+    flexCancelamento: "desconhecida",
+    linkOferta: null,
+  };
+
+  const fatores: FatorPontuacao[] = [fatorPreco(core, ctx)];
+  const milha = fatorMilha(obs.precoCash, obs.taxas, obs.milhasNecessarias);
+  if (milha) fatores.push(milha);
+  fatores.push(fatorCabine(obs.cabine));
+
+  return notaDaSoma(fatores);
 }
 
 /** Interpretação da nota (escala da seção 7). */

@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/rotas", rotulo: "Rotas" },
   { href: "/alertas", rotulo: "Alertas" },
   { href: "/rotina", rotulo: "Rotina" },
+  { href: "/importar", rotulo: "Importar" },
 ];
 
 export function Nav() {

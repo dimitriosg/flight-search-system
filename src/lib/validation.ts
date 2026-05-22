@@ -225,6 +225,84 @@ export function validarObservacao(raw: Raw): ObservacaoInput {
   return out;
 }
 
+// ---------- Importação de e-mail ----------
+
+const STATUS_IMPORT = ["pendente", "importado", "ignorado", "falha"];
+
+export interface ImportacaoEmailInput {
+  fonte: string | null;
+  assunto: string | null;
+  remetente: string | null;
+  recebidoEm: Date | null;
+  textoBruto: string;
+  origem: string | null;
+  destino: string | null;
+  cabine: string | null;
+  preco: number | null;
+  moeda: string | null;
+  dataIda: Date | null;
+  dataVolta: Date | null;
+  confianca: number;
+  status: string;
+}
+
+function toDate(v: unknown): Date | null {
+  const s = toStr(v);
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * @param criarObservacao quando true, exige os campos necessários para gerar
+ * uma Observacao (origem, destino, cabine, preço).
+ */
+export function validarImportacaoEmail(
+  raw: Raw,
+  criarObservacao: boolean,
+): ImportacaoEmailInput {
+  const erros: Record<string, string> = {};
+  const textoBruto = toStr(raw.textoBruto);
+  if (!textoBruto) erros.textoBruto = "Cole o texto do e-mail.";
+
+  const origem = toStr(raw.origem) ?? null;
+  const destino = toStr(raw.destino) ?? null;
+  const cabine = toStr(raw.cabine) ?? null;
+  const preco = toNum(raw.preco);
+
+  if (cabine && !CABINES_VALIDAS.includes(cabine))
+    erros.cabine = "Cabine inválida.";
+
+  if (criarObservacao) {
+    if (!origem) erros.origem = "Informe a origem.";
+    if (!destino) erros.destino = "Informe o destino.";
+    if (!cabine) erros.cabine = "Informe a cabine.";
+    if (preco == null) erros.preco = "Informe o preço para criar a observação.";
+  }
+
+  const status = toStr(raw.status) ?? "pendente";
+  if (!STATUS_IMPORT.includes(status)) erros.status = "Status inválido.";
+
+  if (Object.keys(erros).length) throw new ErroValidacao(erros);
+
+  return {
+    fonte: toStr(raw.fonte) ?? null,
+    assunto: toStr(raw.assunto) ?? null,
+    remetente: toStr(raw.remetente) ?? null,
+    recebidoEm: toDate(raw.recebidoEm),
+    textoBruto: textoBruto!,
+    origem,
+    destino,
+    cabine,
+    preco,
+    moeda: toStr(raw.moeda) ?? null,
+    dataIda: toDate(raw.dataIda),
+    dataVolta: toDate(raw.dataVolta),
+    confianca: toNum(raw.confianca) ?? 0,
+    status,
+  };
+}
+
 // ---------- Alerta ----------
 
 export interface AlertaInput {
