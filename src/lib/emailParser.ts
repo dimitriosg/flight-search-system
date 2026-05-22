@@ -246,11 +246,12 @@ export function detectarDatas(texto: string): string[] {
     if (mes) add(+m[3], mes, +m[2], m.index);
   }
 
-  // "Tue 22 Dec–Fri 8 Jan" — date range without year (Google Flights style).
+  // "Tue 22 Dec–Fri 8 Jan" or "Mon 31 Aug - Tue 8 Sept" — date range without year.
   // Year is inferred from anchorAno; if return month < departure month the
   // return year rolls over to anchorAno + 1.
+  // \s* before the dash handles both "Dec–Jan" (no space) and "Dec – Jan" (spaced).
   const reRange =
-    /\b(?:[a-z]{2,3}\.?\s+)?(\d{1,2})\s+([a-z]{3,9})[–\-]\s*(?:[a-z]{2,3}\.?\s+)?(\d{1,2})\s+([a-z]{3,9})\b/gi;
+    /\b(?:[a-z]{2,3}\.?\s+)?(\d{1,2})\s+([a-z]{3,9})\s*[–\-]\s*(?:[a-z]{2,3}\.?\s+)?(\d{1,2})\s+([a-z]{3,9})\b/gi;
   while ((m = reRange.exec(textoViagem))) {
     const mesPartida = MESES[m[2].slice(0, 3).toLowerCase()];
     const mesVolta   = MESES[m[4].slice(0, 3).toLowerCase()];
@@ -282,7 +283,16 @@ export function parseEmail(entrada: EntradaEmail): AlertaParseado {
     .filter(Boolean)
     .join("\n");
 
-  const aeroportos = detectarAeroportos(texto);
+  // Airport detection uses body + sender only — NOT the subject.
+  // Subjects often say "to <destination>" without naming the origin,
+  // which would place the destination at a lower string index and
+  // invert the route order. The body reliably lists both airports in
+  // the correct origin → destination sequence.
+  const textoRota = [entrada.remetente, entrada.textoBruto]
+    .filter(Boolean)
+    .join("\n");
+
+  const aeroportos = detectarAeroportos(textoRota);
   const origem = aeroportos[0] ?? null;
   const destino = aeroportos[1] ?? null;
   const cabine = detectarCabine(texto);
