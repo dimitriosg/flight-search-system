@@ -605,7 +605,7 @@ R$20,423 (dropped from R$22,879)
 
 Prices updated 18 May 2026 at 21:11 GMT`;
 
-  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -655,7 +655,7 @@ KLM · 1 stop · ATH–GRU
 
 Prices updated 18 May 2026 at 04:06 GMT`;
 
-  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -705,7 +705,7 @@ ITA · 1 stop · ATH–GRU
 
 Prices updated 15 May 2026 at 14:28 GMT`;
 
-  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -749,7 +749,7 @@ R$20,390 (dropped from R$22,077)
 
 Prices updated 15 May 2026 at 04:57 GMT`;
 
-  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -776,5 +776,29 @@ Prices updated 15 May 2026 at 04:57 GMT`;
 
   it("tem confiança alta", () => {
     expect(r.confianca).toBeGreaterThanOrEqual(LIMIAR_CONFIANCA);
+  });
+});
+
+describe("detectarAeroportos — subject-only destination hint não inverte rota", () => {
+  // Regression: subjects like "to São Paulo is now €X" place GRU at a lower
+  // string index than "Athens" in the body, inverting the route. Parser must
+  // use body (not subject) for airport position ranking.
+  it("subject 'to São Paulo' + body 'Athens to São Paulo' → origem ATH, destino GRU", () => {
+    const r = parseEmail({
+      assunto: "Your tracked flight to São Paulo is now €1,000 (was €1,200)",
+      remetente: "noreply@google.com",
+      textoBruto: [
+        "Google Flights",
+        "",
+        "Athens to São Paulo",
+        "Sat 10 Jan – Sat 17 Jan",
+        "Round trip · Business · 1 adult",
+        "€1,000 (dropped from €1,200)",
+        "",
+        "Prices updated 22 May 2026 at 10:00 GMT",
+      ].join("\n"),
+    });
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
   });
 });

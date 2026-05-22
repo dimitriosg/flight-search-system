@@ -283,7 +283,16 @@ export function parseEmail(entrada: EntradaEmail): AlertaParseado {
     .filter(Boolean)
     .join("\n");
 
-  const aeroportos = detectarAeroportos(texto);
+  // Airport detection uses body + sender only — NOT the subject.
+  // Subjects often say "to <destination>" without naming the origin,
+  // which would place the destination at a lower string index and
+  // invert the route order. The body reliably lists both airports in
+  // the correct origin → destination sequence.
+  const textoRota = [entrada.remetente, entrada.textoBruto]
+    .filter(Boolean)
+    .join("\n");
+
+  const aeroportos = detectarAeroportos(textoRota);
   const origem = aeroportos[0] ?? null;
   const destino = aeroportos[1] ?? null;
   const cabine = detectarCabine(texto);
