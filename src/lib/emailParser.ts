@@ -54,7 +54,7 @@ const ALIASES: Record<string, string> = (() => {
 })();
 
 const PROVEDORES: { nome: string; padrao: RegExp }[] = [
-  { nome: "Google Flights", padrao: /google\s*flights|google\.com\/travel/i },
+  { nome: "Google Flights", padrao: /google\s*flights|google\.com/i },
   { nome: "Skyscanner", padrao: /skyscanner/i },
   { nome: "KAYAK", padrao: /kayak/i },
   { nome: "Momondo", padrao: /momondo/i },
@@ -180,11 +180,35 @@ export function detectarPreco(
   return { preco: candidatos[0].preco, moeda: candidatos[0].moeda };
 }
 
+/**
+ * Remove "Prices updated …" footer timestamps so they are not treated as
+ * travel dates. Handles both own-line and inline occurrences.
+ */
+function stripMetaTimestamps(texto: string): string {
+  return texto.replace(/\bprices?\s+updated\b[^\n]*/gi, "");
+}
+
+/**
+ * Finds the first 4-digit year in the text (e.g. from the update timestamp)
+ * to use as an anchor when inferring years for yearless date ranges.
+ */
+function inferirAnoBase(texto: string): number {
+  const m = /\b(20\d{2})\b/.exec(texto);
+  return m ? +m[1] : new Date().getFullYear();
+}
+
 function isoValido(ano: number, mes: number, dia: number): boolean {
   return mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31 && ano >= 2000 && ano <= 2100;
 }
 
 export function detectarDatas(texto: string): string[] {
+  // Read anchor year from the ORIGINAL text (may include update timestamps).
+  const anchorAno = inferirAnoBase(texto);
+
+  // Strip "Prices updated …" and similar metadata lines so their dates are
+  // not mistaken for travel departure/return dates.
+  const textoViagem = stripMetaTimestamps(texto);
+
   const achados: { iso: string; idx: number }[] = [];
   const add = (a: number, m2: number, d: number, idx: number) => {
     if (isoValido(a, m2, d)) {
@@ -196,25 +220,47 @@ export function detectarDatas(texto: string): string[] {
   };
 
   let m: RegExpExecArray | null;
-  const reIso = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
-  while ((m = reIso.exec(texto))) add(+m[1], +m[2], +m[3], m.index);
 
+  // yyyy-mm-dd
+  const reIso = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+  while ((m = reIso.exec(textoViagem))) add(+m[1], +m[2], +m[3], m.index);
+
+  // dd/mm/yyyy
   const reDmy = /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/g;
-  while ((m = reDmy.exec(texto))) {
+  while ((m = reDmy.exec(textoViagem))) {
     const ano = m[3].length === 2 ? 2000 + +m[3] : +m[3];
-    add(ano, +m[2], +m[1], m.index); // dd/mm/yyyy
+    add(ano, +m[2], +m[1], m.index);
   }
 
+  // "10 fevereiro 2027" or "10 de fevereiro de 2027"
   const reDiaMes = /\b(\d{1,2})(?:\s+de)?\s+([a-zç]{3,9})\.?(?:\s+de)?\s+(\d{4})\b/gi;
-  while ((m = reDiaMes.exec(texto))) {
+  while ((m = reDiaMes.exec(textoViagem))) {
     const mes = MESES[m[2].slice(0, 3).toLowerCase()];
     if (mes) add(+m[3], mes, +m[1], m.index);
   }
 
+  // "Oct 12, 2026" or "March 8 2027"
   const reMesDia = /\b([a-zç]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi;
-  while ((m = reMesDia.exec(texto))) {
+  while ((m = reMesDia.exec(textoViagem))) {
     const mes = MESES[m[1].slice(0, 3).toLowerCase()];
     if (mes) add(+m[3], mes, +m[2], m.index);
+  }
+
+  // "Tue 22 Dec–Fri 8 Jan" — date range without year (Google Flights style).
+  // Year is inferred from anchorAno; if return month < departure month the
+  // return year rolls over to anchorAno + 1.
+  const reRange =
+    /\b(?:[a-z]{2,3}\.?\s+)?(\d{1,2})\s+([a-z]{3,9})[–\-]\s*(?:[a-z]{2,3}\.?\s+)?(\d{1,2})\s+([a-z]{3,9})\b/gi;
+  while ((m = reRange.exec(textoViagem))) {
+    const mesPartida = MESES[m[2].slice(0, 3).toLowerCase()];
+    const mesVolta   = MESES[m[4].slice(0, 3).toLowerCase()];
+    if (!mesPartida || !mesVolta) continue;
+    const diaPartida = +m[1];
+    const diaVolta   = +m[3];
+    const anoPartida = anchorAno;
+    const anoVolta   = mesVolta < mesPartida ? anchorAno + 1 : anchorAno;
+    add(anoPartida, mesPartida, diaPartida, m.index);
+    add(anoVolta,   mesVolta,   diaVolta,   m.index + 1); // +1 → sorts after departure
   }
 
   achados.sort((a, b) => a.idx - b.idx);
