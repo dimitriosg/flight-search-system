@@ -523,3 +523,258 @@ describe("detectarDatas — 'Prices updated' não contamina datas de viagem", ()
     expect(r.dataIda).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Real Google Flights email fixtures — parser-real-email-fixtures-2
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("parseEmail — Sample 1: Google Flights route deal (Economy, multi-option, EUR)", () => {
+  const assunto = "Your tracked route: Athens to São Paulo flights from €796";
+  const textoBruto = `Hello,
+
+We've found some great prices for one-week trips in August, from Athens to São Paulo.
+
+1-week trips in August
+6–9 days · Round trip · 1 adult · Economy
+
+Mon 31 Aug - Tue 8 Sept
+SAVE 20% From €796
+Qatar Airways · 1 stop · ATH–GRU · 21 hrs
+View
+
+Thu 20 Aug - Wed 26 Aug
+SAVE 11% From €878
+Air Canada · 1 stop · ATH–GRU · 26 hrs
+View
+
+Mon 17 Aug - Wed 26 Aug
+SAVE 8% From €907
+Turkish Airlines · 1 stop · ATH–GRU · 20 hrs
+View
+
+Prices are currently low for August
+€796 is low
+Prices are cheaper than usual. The least expensive flights for similar trips to São Paulo usually cost between €850–1,300. Anything less is considered a deal.
+
+View more flights
+
+Prices updated 21 May 2026 at 04:38 GMT`;
+
+  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+
+  it("identifica fonte Google Flights", () => {
+    expect(r.fonte).toBe("Google Flights");
+  });
+
+  it("extrai rota ATH → GRU e cabine Economy", () => {
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
+    expect(r.cabine).toBe("economy");
+  });
+
+  it("retorna o menor preço listado (€796, primeiro candidato)", () => {
+    expect(r.preco).toBe(796);
+    expect(r.moeda).toBe("EUR");
+  });
+
+  it("extrai primeira data de ida (31 Aug 2026), ignora 'Prices updated'", () => {
+    expect(r.dataIda).toBe("2026-08-31");
+  });
+
+  it("extrai primeira data de volta (8 Sept 2026, mesmo ano)", () => {
+    expect(r.dataVolta).toBe("2026-09-08");
+  });
+
+  it("tem confiança alta", () => {
+    expect(r.confianca).toBeGreaterThanOrEqual(LIMIAR_CONFIANCA);
+  });
+});
+
+describe("parseEmail — Sample 2: Google Flights BRL price drop (Business, Dec–Jan rollover)", () => {
+  const assunto = "Your tracked flight to São Paulo is now R$20,423 (was R$22,879)";
+  const textoBruto = `Google Flights
+
+Hello,
+
+There's been a price change on the following destinations and dates:
+
+Athens to São Paulo
+Tue 22 Dec – Fri 8 Jan
+Round trip · Business · 1 adult
+R$20,423 (dropped from R$22,879)
+
+Prices updated 18 May 2026 at 21:11 GMT`;
+
+  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+
+  it("identifica fonte Google Flights", () => {
+    expect(r.fonte).toBe("Google Flights");
+  });
+
+  it("extrai rota ATH → GRU e Business", () => {
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
+    expect(r.cabine).toBe("business");
+  });
+
+  it("retorna preço atual R$20,423 (não o antigo)", () => {
+    expect(r.preco).toBe(20423);
+    expect(r.moeda).toBe("BRL");
+  });
+
+  it("extrai data de ida (22 Dec 2026), ignora 'Prices updated'", () => {
+    expect(r.dataIda).toBe("2026-12-22");
+  });
+
+  it("infere data de volta como 2027-01-08 (Jan < Dec → cruzamento de ano)", () => {
+    expect(r.dataVolta).toBe("2027-01-08");
+  });
+
+  it("tem confiança alta", () => {
+    expect(r.confianca).toBeGreaterThanOrEqual(LIMIAR_CONFIANCA);
+  });
+});
+
+describe("parseEmail — Sample 3: Google Flights EUR price increase (Business, Dec–Jan rollover)", () => {
+  const assunto = "Your tracked flight to São Paulo is now €4,545 (was €4,021)";
+  const textoBruto = `Google Flights
+
+Hello,
+
+There's been a price change on the following destinations and dates:
+
+Athens to São Paulo
+Wed 30 Dec – Fri 15 Jan
+Round trip · Business · 1 adult
+
+Your tracked flight
+––––––––––––––––––––––––––––––––––––––––
+06:05 – 19:00
+KLM · 1 stop · ATH–GRU
+€4,545 (increased from €4,021)
+
+Prices updated 18 May 2026 at 04:06 GMT`;
+
+  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+
+  it("identifica fonte Google Flights", () => {
+    expect(r.fonte).toBe("Google Flights");
+  });
+
+  it("extrai rota ATH → GRU e Business", () => {
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
+    expect(r.cabine).toBe("business");
+  });
+
+  it("retorna preço atual €4,545 (não o antigo €4,021)", () => {
+    expect(r.preco).toBe(4545);
+    expect(r.moeda).toBe("EUR");
+  });
+
+  it("extrai data de ida (30 Dec 2026), ignora 'Prices updated'", () => {
+    expect(r.dataIda).toBe("2026-12-30");
+  });
+
+  it("infere data de volta como 2027-01-15 (Jan < Dec → cruzamento de ano)", () => {
+    expect(r.dataVolta).toBe("2027-01-15");
+  });
+
+  it("tem confiança alta", () => {
+    expect(r.confianca).toBeGreaterThanOrEqual(LIMIAR_CONFIANCA);
+  });
+});
+
+describe("parseEmail — Sample 4: Google Flights EUR price drop (cabin omitted, Oct–Oct)", () => {
+  const assunto = "Your tracked flight to São Paulo is now €1,063 (was €1,173)";
+  const textoBruto = `Google Flights
+
+Hello,
+
+There's been a price change on the following destinations and dates:
+
+Athens to São Paulo
+Sat 24 Oct – Sat 31 Oct
+Round trip · 1 adult
+
+Your tracked flight
+––––––––––––––––––––––––––––––––––––––––
+06:05 – 16:55
+ITA · 1 stop · ATH–GRU
+€1,063 (dropped from €1,173)
+
+Prices updated 15 May 2026 at 14:28 GMT`;
+
+  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+
+  it("identifica fonte Google Flights", () => {
+    expect(r.fonte).toBe("Google Flights");
+  });
+
+  it("extrai rota ATH → GRU", () => {
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
+  });
+
+  it("cabine null quando não mencionada no corpo", () => {
+    expect(r.cabine).toBeNull();
+  });
+
+  it("retorna preço atual €1,063 (não o antigo €1,173)", () => {
+    expect(r.preco).toBe(1063);
+    expect(r.moeda).toBe("EUR");
+  });
+
+  it("extrai data de ida (24 Oct 2026), ignora 'Prices updated'", () => {
+    expect(r.dataIda).toBe("2026-10-24");
+  });
+
+  it("extrai data de volta (31 Oct 2026, mesmo mês sem cruzamento de ano)", () => {
+    expect(r.dataVolta).toBe("2026-10-31");
+  });
+});
+
+describe("parseEmail — Sample 5: Google Flights BRL drop (Business, same route/dates, different price)", () => {
+  const assunto = "Your tracked flight to São Paulo is now R$20,390 (was R$22,077)";
+  const textoBruto = `Google Flights
+
+Hello,
+
+There's been a price change on the following destinations and dates:
+
+Athens to São Paulo
+Tue 22 Dec – Fri 8 Jan
+Round trip · Business · 1 adult
+R$20,390 (dropped from R$22,077)
+
+Prices updated 15 May 2026 at 04:57 GMT`;
+
+  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+
+  it("identifica fonte Google Flights", () => {
+    expect(r.fonte).toBe("Google Flights");
+  });
+
+  it("extrai rota ATH → GRU e Business", () => {
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
+    expect(r.cabine).toBe("business");
+  });
+
+  it("retorna preço atual R$20,390 (não o antigo)", () => {
+    expect(r.preco).toBe(20390);
+    expect(r.moeda).toBe("BRL");
+  });
+
+  it("extrai data de ida (22 Dec 2026), ignora 'Prices updated'", () => {
+    expect(r.dataIda).toBe("2026-12-22");
+  });
+
+  it("infere data de volta como 2027-01-08 (Jan < Dec → cruzamento de ano)", () => {
+    expect(r.dataVolta).toBe("2027-01-08");
+  });
+
+  it("tem confiança alta", () => {
+    expect(r.confianca).toBeGreaterThanOrEqual(LIMIAR_CONFIANCA);
+  });
+});
