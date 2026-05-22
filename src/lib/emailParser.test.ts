@@ -408,3 +408,118 @@ describe("detectarDatas — formato PT estendido (dia de mês de ano)", () => {
     expect(r.dataIda).toBe("2026-10-05");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Google Flights real alert — date range + metadata timestamp regression
+// ─────────────────────────────────────────────────────────────────────────────
+
+const googleFlightsRealAlert = `Hello,
+
+There's been a price change on the following destinations and dates:
+
+Athens to São Paulo
+Tue 22 Dec–Fri 8 Jan
+Round trip · Business · 1 adult
+
+↓ R$20,423
+R$22,879
+
+15:50 – 19:00+1
+Iberia · 1 stop · ATH–GRU
+R$20,423
+
+06:00 – 18:40
+ITA · 1 stop · ATH–GRU
+R$22,737
+
+16:55 – 06:00+1
+British Airways · 1 stop · ATH–GRU
+R$23,155
+
+Show all flights
+
+Prices updated 18 May 2026 at 21:11 GMT`;
+
+describe("parseEmail — Google Flights real alert (intervalo de datas + timestamp)", () => {
+  const r = parseEmail({
+    textoBruto: googleFlightsRealAlert,
+    remetente: "noreply@google.com",
+  });
+
+  it("identifica fonte Google Flights via remetente", () => {
+    expect(r.fonte).toBe("Google Flights");
+  });
+
+  it("extrai rota ATH → GRU", () => {
+    expect(r.origem).toBe("ATH");
+    expect(r.destino).toBe("GRU");
+  });
+
+  it("identifica Business Class", () => {
+    expect(r.cabine).toBe("business");
+  });
+
+  it("retorna o menor preço listado (R$20,423 — primeiro na lista)", () => {
+    expect(r.preco).toBe(20423);
+    expect(r.moeda).toBe("BRL");
+  });
+
+  it("usa a data de viagem 'Tue 22 Dec', não o timestamp 'Prices updated'", () => {
+    expect(r.dataIda).toBe("2026-12-22");
+  });
+
+  it("infere ano de volta como 2027 (Jan < Dec → cruzamento de ano)", () => {
+    expect(r.dataVolta).toBe("2027-01-08");
+  });
+
+  it("tem confiança alta", () => {
+    expect(r.confianca).toBeGreaterThanOrEqual(LIMIAR_CONFIANCA);
+  });
+});
+
+describe("detectarDatas — intervalo sem ano (reRange) e inferência de ano", () => {
+  it("intervalo cruzando ano: Dec→Jan usa anchorAno + 1 para volta", () => {
+    const r = parseEmail({
+      textoBruto:
+        "ATH → GRU Business. Tue 22 Dec–Fri 8 Jan. Prices updated 18 May 2026.",
+    });
+    expect(r.dataIda).toBe("2026-12-22");
+    expect(r.dataVolta).toBe("2027-01-08");
+  });
+
+  it("intervalo no mesmo ano: Jun→Jun não cruza", () => {
+    const r = parseEmail({
+      textoBruto:
+        "ATH → GRU Business. Tue 10 Jun–Tue 24 Jun. Prices updated 18 May 2026.",
+    });
+    expect(r.dataIda).toBe("2026-06-10");
+    expect(r.dataVolta).toBe("2026-06-24");
+  });
+
+  it("intervalo Nov→Dez no mesmo ano não cruza", () => {
+    const r = parseEmail({
+      textoBruto:
+        "ATH → GRU Business. Mon 20 Nov–Fri 5 Dec. Prices updated 18 May 2026.",
+    });
+    expect(r.dataIda).toBe("2026-11-20");
+    expect(r.dataVolta).toBe("2026-12-05");
+  });
+});
+
+describe("detectarDatas — 'Prices updated' não contamina datas de viagem", () => {
+  it("suprime timestamp de footer (linha própria)", () => {
+    const r = parseEmail({
+      textoBruto:
+        "ATH → GRU Business €2.100.\n\nPrices updated 18 May 2026 at 21:11 GMT",
+    });
+    expect(r.dataIda).toBeNull();
+  });
+
+  it("suprime timestamp inline na mesma linha", () => {
+    const r = parseEmail({
+      textoBruto:
+        "ATH → GRU Business €2.100. Prices updated 18 May 2026.",
+    });
+    expect(r.dataIda).toBeNull();
+  });
+});
