@@ -5,6 +5,14 @@ import {
   normalizarNumero,
   LIMIAR_CONFIANCA,
 } from "./emailParser";
+import {
+  mainGoogleFlightsAlert,
+  sample1RouteEconomyEur,
+  sample2BrlDropDecJan,
+  sample3EurIncreaseDecJan,
+  sample4EurDropCabinOmitted,
+  sample5BrlDropSameRoute,
+} from "./__fixtures__/emailFixtures";
 
 const googleEmail = `From: Google Flights <noreply@google.com>
 Price drop on your tracked trip
@@ -413,38 +421,8 @@ describe("detectarDatas — formato PT estendido (dia de mês de ano)", () => {
 // Google Flights real alert — date range + metadata timestamp regression
 // ─────────────────────────────────────────────────────────────────────────────
 
-const googleFlightsRealAlert = `Hello,
-
-There's been a price change on the following destinations and dates:
-
-Athens to São Paulo
-Tue 22 Dec–Fri 8 Jan
-Round trip · Business · 1 adult
-
-↓ R$20,423
-R$22,879
-
-15:50 – 19:00+1
-Iberia · 1 stop · ATH–GRU
-R$20,423
-
-06:00 – 18:40
-ITA · 1 stop · ATH–GRU
-R$22,737
-
-16:55 – 06:00+1
-British Airways · 1 stop · ATH–GRU
-R$23,155
-
-Show all flights
-
-Prices updated 18 May 2026 at 21:11 GMT`;
-
 describe("parseEmail — Google Flights real alert (intervalo de datas + timestamp)", () => {
-  const r = parseEmail({
-    textoBruto: googleFlightsRealAlert,
-    remetente: "noreply@google.com",
-  });
+  const r = parseEmail(mainGoogleFlightsAlert);
 
   it("identifica fonte Google Flights via remetente", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -529,38 +507,7 @@ describe("detectarDatas — 'Prices updated' não contamina datas de viagem", ()
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("parseEmail — Sample 1: Google Flights route deal (Economy, multi-option, EUR)", () => {
-  const assunto = "Your tracked route: Athens to São Paulo flights from €796";
-  const textoBruto = `Hello,
-
-We've found some great prices for one-week trips in August, from Athens to São Paulo.
-
-1-week trips in August
-6–9 days · Round trip · 1 adult · Economy
-
-Mon 31 Aug - Tue 8 Sept
-SAVE 20% From €796
-Qatar Airways · 1 stop · ATH–GRU · 21 hrs
-View
-
-Thu 20 Aug - Wed 26 Aug
-SAVE 11% From €878
-Air Canada · 1 stop · ATH–GRU · 26 hrs
-View
-
-Mon 17 Aug - Wed 26 Aug
-SAVE 8% From €907
-Turkish Airlines · 1 stop · ATH–GRU · 20 hrs
-View
-
-Prices are currently low for August
-€796 is low
-Prices are cheaper than usual. The least expensive flights for similar trips to São Paulo usually cost between €850–1,300. Anything less is considered a deal.
-
-View more flights
-
-Prices updated 21 May 2026 at 04:38 GMT`;
-
-  const r = parseEmail({ textoBruto, remetente: "noreply@google.com" });
+  const r = parseEmail(sample1RouteEconomyEur);
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -591,21 +538,7 @@ Prices updated 21 May 2026 at 04:38 GMT`;
 });
 
 describe("parseEmail — Sample 2: Google Flights BRL price drop (Business, Dec–Jan rollover)", () => {
-  const assunto = "Your tracked flight to São Paulo is now R$20,423 (was R$22,879)";
-  const textoBruto = `Google Flights
-
-Hello,
-
-There's been a price change on the following destinations and dates:
-
-Athens to São Paulo
-Tue 22 Dec – Fri 8 Jan
-Round trip · Business · 1 adult
-R$20,423 (dropped from R$22,879)
-
-Prices updated 18 May 2026 at 21:11 GMT`;
-
-  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
+  const r = parseEmail(sample2BrlDropDecJan);
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -636,26 +569,7 @@ Prices updated 18 May 2026 at 21:11 GMT`;
 });
 
 describe("parseEmail — Sample 3: Google Flights EUR price increase (Business, Dec–Jan rollover)", () => {
-  const assunto = "Your tracked flight to São Paulo is now €4,545 (was €4,021)";
-  const textoBruto = `Google Flights
-
-Hello,
-
-There's been a price change on the following destinations and dates:
-
-Athens to São Paulo
-Wed 30 Dec – Fri 15 Jan
-Round trip · Business · 1 adult
-
-Your tracked flight
-––––––––––––––––––––––––––––––––––––––––
-06:05 – 19:00
-KLM · 1 stop · ATH–GRU
-€4,545 (increased from €4,021)
-
-Prices updated 18 May 2026 at 04:06 GMT`;
-
-  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
+  const r = parseEmail(sample3EurIncreaseDecJan);
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -686,26 +600,7 @@ Prices updated 18 May 2026 at 04:06 GMT`;
 });
 
 describe("parseEmail — Sample 4: Google Flights EUR price drop (cabin omitted, Oct–Oct)", () => {
-  const assunto = "Your tracked flight to São Paulo is now €1,063 (was €1,173)";
-  const textoBruto = `Google Flights
-
-Hello,
-
-There's been a price change on the following destinations and dates:
-
-Athens to São Paulo
-Sat 24 Oct – Sat 31 Oct
-Round trip · 1 adult
-
-Your tracked flight
-––––––––––––––––––––––––––––––––––––––––
-06:05 – 16:55
-ITA · 1 stop · ATH–GRU
-€1,063 (dropped from €1,173)
-
-Prices updated 15 May 2026 at 14:28 GMT`;
-
-  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
+  const r = parseEmail(sample4EurDropCabinOmitted);
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
@@ -735,21 +630,7 @@ Prices updated 15 May 2026 at 14:28 GMT`;
 });
 
 describe("parseEmail — Sample 5: Google Flights BRL drop (Business, same route/dates, different price)", () => {
-  const assunto = "Your tracked flight to São Paulo is now R$20,390 (was R$22,077)";
-  const textoBruto = `Google Flights
-
-Hello,
-
-There's been a price change on the following destinations and dates:
-
-Athens to São Paulo
-Tue 22 Dec – Fri 8 Jan
-Round trip · Business · 1 adult
-R$20,390 (dropped from R$22,077)
-
-Prices updated 15 May 2026 at 04:57 GMT`;
-
-  const r = parseEmail({ textoBruto, assunto, remetente: "noreply@google.com" });
+  const r = parseEmail(sample5BrlDropSameRoute);
 
   it("identifica fonte Google Flights", () => {
     expect(r.fonte).toBe("Google Flights");
