@@ -1,0 +1,87 @@
+// Sistema de Passagens Baratas — modelo de dados (MVP, uso pessoal)
+// Entrada manual de dados. Sem dependência de APIs pagas.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+/// Rotas monitoradas (cadastro de rotas)
+model Rota {
+  id                   String   @id @default(cuid())
+  origem               String
+  destino              String
+  cabine               String // economy | premium | business
+  datasDesejadas       String? // texto livre, ex: "Out/Nov 2026"
+  flexibilidadeDias    Int      @default(0)
+  precoMaximo          Float?
+  companhiaPreferida   String?
+  programaMilhas       String?
+  precoMedioReferencia Float? // média histórica de referência (manual, opcional)
+  observacoes          String?
+  ativa                Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+/// Oportunidades encontradas manualmente (cadastro de oportunidades)
+model Oportunidade {
+  id                String   @id @default(cuid())
+  dataBusca         DateTime @default(now())
+  origem            String
+  destino           String
+  companhia         String?
+  cabine            String // economy | premium | business
+  escalas           Int      @default(0)
+  duracaoMinutos    Int? // duração total em minutos
+  precoCash         Float?
+  milhasNecessarias Int?
+  taxas             Float    @default(0)
+  bagagemIncluida   Boolean  @default(false)
+  linkOferta        String?
+  compraDireta      Boolean  @default(false) // compra direta com a companhia
+  bilhetesSeparados Boolean  @default(false)
+  conexaoHoras      Float? // horas entre voos separados
+  flexCancelamento  String   @default("desconhecida") // flexivel | rigida | desconhecida
+  observacoes       String?
+  status            String   @default("observar") // observar | comparar | comprar | descartado
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// Observações de preço (log de monitoramento ao longo do tempo).
+/// Separado de Oportunidade: aqui ficam amostras recorrentes de preço por
+/// rota/cabine, usadas para calcular a média observada que alimenta a nota.
+model Observacao {
+  id                String   @id @default(cuid())
+  dataObservacao    DateTime @default(now())
+  origem            String
+  destino           String
+  cabine            String // economy | premium | business
+  precoCash         Float?
+  milhasNecessarias Int?
+  taxas             Float    @default(0)
+  fonte             String? // plataforma onde o preço foi observado
+  observacoes       String?
+  createdAt         DateTime @default(now())
+
+  @@index([origem, destino, cabine])
+}
+
+/// Alertas criados em plataformas externas (alertas manuais)
+model Alerta {
+  id             String   @id @default(cuid())
+  plataforma     String // Google Flights | Skyscanner | KAYAK | Seats.aero | AwardFares | ...
+  rota           String // ex: "ATH > GRU"
+  cabine         String
+  datas          String?
+  linkAlerta     String?
+  frequenciaDias Int      @default(1)
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
